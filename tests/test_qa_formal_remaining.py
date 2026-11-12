@@ -104,8 +104,13 @@ async def test_register_rate_limit_by_ip(api_client, app_db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_openapi_lists_rest_not_only_healthz(api_client, app_db, monkeypatch):
+    from jizhang_mcp.api.openapi import rest_operation_url
+
     monkeypatch.setenv("JIZHANG_ASGI_ROOT_PATH", "/jizhangapi")
-    monkeypatch.setenv("JIZHANG_PUBLIC_API_BASE", "https://example.test/jizhangapi/api/v1")
+    monkeypatch.setenv(
+        "JIZHANG_PUBLIC_API_BASE",
+        "https://yunqingkeji.site/jizhangapi/api",
+    )
     get_settings.cache_clear()
     from jizhang_mcp.app import create_app
 
@@ -117,10 +122,28 @@ async def test_openapi_lists_rest_not_only_healthz(api_client, app_db, monkeypat
         spec = await c.get("/openapi.json")
         assert spec.status_code == 200
         data = spec.json()
-        assert data["servers"][0]["url"] == "https://example.test/jizhangapi/api/v1"
+        server = data["servers"][0]["url"]
+        assert server == "https://yunqingkeji.site/jizhangapi/api"
+        assert not server.endswith("/v1")
         paths = data.get("paths") or {}
-        assert "/v1/ledger/entries" in paths or any("ledger" in p for p in paths)
+        assert "/v1/ledger/entries" in paths
+        assert "/v1/auth/login" in paths
         assert "/healthz" not in paths
+        login_url = rest_operation_url(server, "/v1/auth/login")
+        ledger_url = rest_operation_url(server, "/v1/ledger/entries")
+        assert login_url == "https://yunqingkeji.site/jizhangapi/api/v1/auth/login"
+        assert ledger_url == "https://yunqingkeji.site/jizhangapi/api/v1/ledger/entries"
+        assert "/v1/v1" not in login_url
+        mcp = await c.get("/mcp")
+        assert mcp.status_code != 404
+
+
+def test_public_api_base_strips_trailing_v1_suffix(monkeypatch):
+    from jizhang_mcp.config import get_settings
+
+    monkeypatch.setenv("JIZHANG_PUBLIC_API_BASE", "https://yunqingkeji.site/jizhangapi/api/v1")
+    get_settings.cache_clear()
+    assert get_settings().rest_api_mount_base == "https://yunqingkeji.site/jizhangapi/api"
 
 
 def test_server_json_present():

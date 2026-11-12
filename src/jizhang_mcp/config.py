@@ -41,11 +41,19 @@ class Settings(BaseSettings):
         return p
 
     @property
-    def openapi_server_url(self) -> str:
+    def rest_api_mount_base(self) -> str:
+        """OpenAPI servers[0].url：REST 挂载点（…/api），不含 /v1（paths 已带 /v1）。"""
         if self.public_api_base.strip():
-            return self.public_api_base.strip().rstrip("/")
+            base = self.public_api_base.strip().rstrip("/")
+            if base.endswith("/v1"):
+                base = base[: -len("/v1")]
+            return base
         root = self.root_path_normalized
-        return f"{root}/api/v1" if root else "/api/v1"
+        return f"{root}/api" if root else "/api"
+
+    @property
+    def openapi_server_url(self) -> str:
+        return self.rest_api_mount_base
 
 
 @lru_cache
