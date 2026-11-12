@@ -30,7 +30,7 @@ def tools_visible_to(principal: Principal) -> list[str]:
 
 
 def extract_api_key() -> str | None:
-    headers = get_http_headers() or {}
+    headers = get_http_headers(include={"authorization"}) or {}
     auth = headers.get("authorization") or headers.get("Authorization")
     if auth and auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip()
@@ -45,7 +45,7 @@ def extract_api_key() -> str | None:
 
 
 def session_key_from_headers() -> str:
-    headers = get_http_headers() or {}
+    headers = get_http_headers(include={"authorization"}) or {}
     sid = headers.get("mcp-session-id") or headers.get("Mcp-Session-Id")
     if sid:
         return sid

@@ -202,9 +202,24 @@ from jizhang_mcp.util.time_util import iso_local  # noqa: E402
 
 
 async def list_entries(session, user_id: int, **filters) -> ListResult:
-    limit = min(int(filters.get("limit", 50)), 200)
-    offset = int(filters.get("offset", 0))
-    items, total = await ledger_repo.list_entries(session, user_id, limit=limit, offset=offset, **filters)
+    limit = min(int(filters.pop("limit", 50)), 200)
+    offset = int(filters.pop("offset", 0))
+    items, total = await ledger_repo.list_entries(
+        session,
+        user_id,
+        date_from=filters.get("date_from"),
+        date_to=filters.get("date_to"),
+        direction=filters.get("direction"),
+        category_id=filters.get("category_id"),
+        root_category_id=filters.get("root_category_id"),
+        currency=filters.get("currency"),
+        keyword=filters.get("keyword"),
+        min_amount=filters.get("min_amount"),
+        max_amount=filters.get("max_amount"),
+        recurring_rule_id=filters.get("recurring_rule_id"),
+        limit=limit,
+        offset=offset,
+    )
     outs = [await ledger_to_out(session, e) for e in items]
     truncated = False
     return ListResult(

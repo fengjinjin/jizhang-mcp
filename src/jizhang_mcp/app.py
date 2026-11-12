@@ -5,12 +5,15 @@ from fastapi import FastAPI
 from jizhang_mcp.config import get_settings
 from jizhang_mcp.db import dispose_engine, init_engine
 from jizhang_mcp.mcp_server import mcp
+from jizhang_mcp.middleware.mcp_protocol_asgi import McpProtocolAsgiMiddleware
 from jizhang_mcp.services.scheduler import RecurringScheduler
 
-mcp_app = mcp.http_app(
-    path="/mcp",
-    transport="streamable-http",
-    stateless_http=True,
+mcp_app = McpProtocolAsgiMiddleware(
+    mcp.http_app(
+        path="/mcp",
+        transport="streamable-http",
+        stateless_http=True,
+    )
 )
 
 

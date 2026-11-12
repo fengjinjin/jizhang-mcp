@@ -43,7 +43,7 @@ async def verify_passphrase_for_user(session: AsyncSession, user_id: int, passph
         raise PassphraseNotEnabledError("未启用暗号")
     akey = _auth_key_user(user_id)
     fail_store.check_auth_locked(akey)
-    if not PASSWORD_HASHER.verify(user.passphrase_hash, passphrase):
+    if not verify_password(user.passphrase_hash, passphrase):
         fail_store.record_auth_failure(akey)
         raise InvalidPassphraseError("暗号不正确")
     fail_store.clear_auth(akey)
@@ -60,7 +60,7 @@ async def update_passphrase(
             raise PassphraseRequiredError("需要提供当前暗号")
         akey = _auth_key_user(user_id)
         fail_store.check_auth_locked(akey)
-        if not PASSWORD_HASHER.verify(user.passphrase_hash, current):
+        if not verify_password(user.passphrase_hash, current):
             fail_store.record_auth_failure(akey)
             raise InvalidPassphraseError("暗号不正确")
         fail_store.clear_auth(akey)
