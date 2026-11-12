@@ -39,13 +39,13 @@ async def combined_lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    root = settings.root_path_normalized or None
+    # JIZHANG_ASGI_ROOT_PATH 仅用于公网 OpenAPI 文档 URL；不可设 FastAPI.root_path，
+    # 否则 nginx 剥 /jizhangapi 后容器内 /api/v1/* 会 404。
     app = FastAPI(
         title="jizhang",
         version="1.0.0",
         lifespan=combined_lifespan,
         redirect_slashes=False,
-        root_path=root,
         docs_url=None,
         openapi_url=None,
     )

@@ -80,6 +80,9 @@ def sse_uvicorn_server():
         ),
         "JIZHANG_JWT_SECRET": os.environ.get("JIZHANG_JWT_SECRET", "test-jwt-secret-32chars-minimum"),
         "JIZHANG_REGISTER_RATE_PER_HOUR": "1000",
+        "JIZHANG_ASGI_ROOT_PATH": "/jizhangapi",
+        "JIZHANG_PUBLIC_API_BASE": "https://yunqingkeji.site/jizhangapi/api",
+        "JIZHANG_PUBLIC_MCP_URL": "https://yunqingkeji.site/jizhangmcp",
     }
     env.pop("FASTMCP_JSON_RESPONSE", None)
     proc = subprocess.Popen(
@@ -227,3 +230,17 @@ def test_sse_tools_list_and_call_bearer(sse_client, sse_user):
 def test_mcp_mount_unaffected_with_root_path(sse_client):
     r = sse_client.get("/mcp", headers={"Accept": MCP_ACCEPT})
     assert r.status_code != 404
+
+
+def test_proxy_stripped_rest_and_openapi(sse_client):
+    """nginx 剥 /jizhangapi 后容器应匹配 /api/v1/*（非 /jizhangapi/api/v1/*）。"""
+    from jizhang_mcp.api.openapi import rest_operation_url
+
+    assert sse_client.get("/api/v1/health").status_code == 200
+    assert sse_client.get("/jizhangapi/api/v1/health").status_code == 404
+    spec = sse_client.get("/openapi.json").json()
+    server = spec["servers"][0]["url"]
+    assert server == "https://yunqingkeji.site/jizhangapi/api"
+    login = rest_operation_url(server, "/v1/auth/login")
+    assert login == "https://yunqingkeji.site/jizhangapi/api/v1/auth/login"
+    assert sse_client.get("/docs").status_code == 200

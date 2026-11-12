@@ -134,8 +134,14 @@ async def test_openapi_lists_rest_not_only_healthz(api_client, app_db, monkeypat
         assert login_url == "https://yunqingkeji.site/jizhangapi/api/v1/auth/login"
         assert ledger_url == "https://yunqingkeji.site/jizhangapi/api/v1/ledger/entries"
         assert "/v1/v1" not in login_url
+        health = await c.get("/api/v1/health")
+        assert health.status_code == 200, "剥前缀后容器内需直达 /api/v1/*"
+        prefixed = await c.get("/jizhangapi/api/v1/health")
+        assert prefixed.status_code == 404
         mcp = await c.get("/mcp")
         assert mcp.status_code != 404
+        public_openapi = await c.get("/openapi.json")
+        assert public_openapi.status_code == 200
 
 
 def test_public_api_base_strips_trailing_v1_suffix(monkeypatch):
