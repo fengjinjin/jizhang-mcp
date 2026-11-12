@@ -116,16 +116,27 @@ def bridge_modern_request(
     return decoded, header_patches, modified
 
 
-async def _read_http_body(receive) -> bytes | None:
+async def _buffer_request_body(receive):
+    """读完整请求体并返回可链式转发的 receive（SSE 需后续 disconnect 消息）。"""
     chunks: list[bytes] = []
     more = True
     while more:
         message = await receive()
         if message["type"] == "http.disconnect":
-            return None
+            return None, None
         chunks.append(message.get("body", b""))
         more = message.get("more_body", False)
-    return b"".join(chunks)
+    body = b"".join(chunks)
+    sent = False
+
+    async def replay_receive():
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return await receive()
+
+    return body, replay_receive
 
 
 def _apply_header_patches(
@@ -161,44 +172,35 @@ class McpProtocolAsgiMiddleware:
             await self.app(scope, receive, send)
             return
 
-        body = await _read_http_body(receive)
-        if body is None:
-            return
-
         headers = list(scope.get("headers", []))
         header_lookup = _header_map(headers)
         protocol_header = header_lookup.get("mcp-protocol-version")
-        if not body or protocol_header != MODERN_PROTOCOL_VERSION:
-            async def replay_raw():
-                return {"type": "http.request", "body": body, "more_body": False}
+        if protocol_header != MODERN_PROTOCOL_VERSION:
+            await self.app(scope, receive, send)
+            return
 
-            await self.app(scope, replay_raw, send)
+        body, replay_receive = await _buffer_request_body(receive)
+        if body is None:
+            return
+        if not body:
+            await self.app(scope, replay_receive, send)
             return
 
         try:
             decoded = json.loads(body)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            async def replay_raw():
-                return {"type": "http.request", "body": body, "more_body": False}
-
-            await self.app({**scope, "headers": headers}, replay_raw, send)
+            await self.app({**scope, "headers": headers}, replay_receive, send)
             return
 
         if not isinstance(decoded, dict):
-            async def replay_raw():
-                return {"type": "http.request", "body": body, "more_body": False}
-
-            await self.app(scope, replay_raw, send)
+            await self.app(scope, replay_receive, send)
             return
 
         method = decoded.get("method")
         if method == "initialize":
             headers = _strip_header(headers, _MCP_PV)
             scope = {**scope, "headers": headers}
-            async def replay_raw():
-                return {"type": "http.request", "body": body, "more_body": False}
-
-            await self.app(scope, replay_raw, send)
+            await self.app(scope, replay_receive, send)
             return
 
         decoded, header_patches, modified = bridge_modern_request(decoded, protocol_header, header_lookup)
@@ -210,7 +212,13 @@ class McpProtocolAsgiMiddleware:
             headers = _sync_content_length(headers, body)
             scope = {**scope, "headers": headers}
 
-        async def replay_receive():
-            return {"type": "http.request", "body": body, "more_body": False}
+            sent = False
+
+            async def replay_receive():
+                nonlocal sent
+                if not sent:
+                    sent = True
+                    return {"type": "http.request", "body": body, "more_body": False}
+                return await receive()
 
         await self.app(scope, replay_receive, send)
