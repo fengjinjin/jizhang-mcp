@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fengjinjin/jizhang",
+  "version": "1.0.0",
+  "description": "自己的账本，助手可读可复盘。支持记账、分类和查询，不提供投资建议。",
+  "repository": {
+    "url": "https://github.com/fengjinjin/jizhang-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://yunqingkeji.site/jizhangmcp"
+    }
+  ],
+  "authentication": {
+    "type": "http",
+    "headers": {
+      "Authorization": {
+        "required": true,
+        "secret": true,
+        "description": "在 Web 控制台创建连接密钥后，以 Bearer <jz_live_…> 传入"
+      }
+    }
+  }
+}

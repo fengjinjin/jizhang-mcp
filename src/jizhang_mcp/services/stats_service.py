@@ -209,6 +209,18 @@ def _prev_adjacent(df: datetime, dt: datetime) -> tuple[datetime, datetime]:
     return df - delta - timedelta(seconds=1), df - timedelta(seconds=1)
 
 
+def _infer_default_compare_mode(df: datetime, dt: datetime) -> str:
+    """当前自然月 / 年初至今的默认环比方式（正式 spec）。"""
+    now = now_local()
+    ms = month_start_local(now.date())
+    ys = datetime(now.year, 1, 1, tzinfo=get_tz())
+    if df >= ms and df.date() == ms.date() and dt.date() == now.date():
+        return "prev_month_same_span"
+    if df >= ys and df.date() == ys.date() and dt.date() == now.date():
+        return "prev_year_same_span"
+    return "prev_adjacent_period"
+
+
 def _prev_year_same(df: datetime, dt: datetime) -> tuple[datetime, datetime]:
     def sh(d: datetime) -> datetime:
         try:
@@ -241,10 +253,7 @@ async def stats_compare(
     df, dt = _parse_range(date_from, date_to)
     mode = compare_mode
     if not mode:
-        if df.date().day == 1 and df.time().hour == 0:
-            mode = "prev_month_same_span"
-        else:
-            mode = "prev_adjacent_period"
+        mode = _infer_default_compare_mode(df, dt)
     if mode == "prev_month_same_span":
         pdf, pdt = _prev_month_same_span(df, dt)
     elif mode == "prev_year_same_span":

@@ -39,11 +39,15 @@ async def combined_lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    root = settings.root_path_normalized or None
     app = FastAPI(
         title="jizhang",
         version="1.0.0",
         lifespan=combined_lifespan,
         redirect_slashes=False,
+        root_path=root,
+        docs_url=None,
+        openapi_url=None,
     )
     from jizhang_mcp.api.error_handlers import register_error_handlers
     from jizhang_mcp.api.router import register_rest_routes

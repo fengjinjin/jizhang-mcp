@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from jizhang_mcp.api.error_handlers import register_error_handlers
+from jizhang_mcp.api.openapi import mount_rest_openapi
 from jizhang_mcp.api.routers import (
     api_keys,
     auth,
@@ -17,7 +18,14 @@ from jizhang_mcp.api.routers import (
 
 
 def register_rest_routes(app: FastAPI, settings) -> None:
-    api = FastAPI(redirect_slashes=False)
+    api = FastAPI(
+        title="jizhang REST API",
+        version="1.0.0",
+        redirect_slashes=False,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
     register_error_handlers(api)
     api.add_middleware(
         CORSMiddleware,
@@ -38,4 +46,5 @@ def register_rest_routes(app: FastAPI, settings) -> None:
     api.include_router(stats.router, prefix="/v1")
     api.include_router(wishlist.router, prefix="/v1")
     app.mount("/api", api)
+    mount_rest_openapi(app, api, settings)
     app.include_router(health.live_router)

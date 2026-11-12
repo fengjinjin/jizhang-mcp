@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 10080
     cors_origins: str = "http://127.0.0.1:5173"
     public_mcp_url: str = "http://127.0.0.1:8000/mcp"
+    asgi_root_path: str = ""
+    public_api_base: str = ""
     timezone: str = "Asia/Shanghai"
     passphrase_ttl_seconds: int = 7200
     auth_max_failures: int = 5
@@ -30,6 +32,20 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def root_path_normalized(self) -> str:
+        p = (self.asgi_root_path or "").strip().rstrip("/")
+        if p and not p.startswith("/"):
+            p = f"/{p}"
+        return p
+
+    @property
+    def openapi_server_url(self) -> str:
+        if self.public_api_base.strip():
+            return self.public_api_base.strip().rstrip("/")
+        root = self.root_path_normalized
+        return f"{root}/api/v1" if root else "/api/v1"
 
 
 @lru_cache

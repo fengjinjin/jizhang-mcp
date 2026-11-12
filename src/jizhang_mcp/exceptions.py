@@ -11,12 +11,14 @@ class JizhangError(Exception):
         hint: str | None = None,
         retry_after_seconds: int | None = None,
         candidates: list[str] | None = None,
+        index: int | None = None,
     ):
         super().__init__(message)
         self.message = message
         self.hint = hint if hint is not None else self.default_hint
         self.retry_after_seconds = retry_after_seconds
         self.candidates = candidates or []
+        self.index = index
 
     def to_payload(self) -> dict:
         payload = {
@@ -30,6 +32,8 @@ class JizhangError(Exception):
             payload["retry_after_seconds"] = self.retry_after_seconds
         if self.candidates:
             payload["candidates"] = self.candidates
+        if self.index is not None:
+            payload["index"] = self.index
         return payload
 
 

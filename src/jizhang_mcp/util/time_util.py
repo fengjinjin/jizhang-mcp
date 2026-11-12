@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from jizhang_mcp.config import get_settings
+from jizhang_mcp.exceptions import ValidationAppError
 
 
 def get_tz() -> ZoneInfo:
@@ -29,21 +30,27 @@ def parse_occurred_at(raw: str | None) -> datetime:
     if raw is None or raw.strip() == "":
         return now_local()
     raw = raw.strip()
-    if len(raw) == 10 and raw[4] == "-" and raw[7] == "-":
-        d = date.fromisoformat(raw)
-        return datetime.combine(d, time(12, 0), tzinfo=tz)
-    dt = datetime.fromisoformat(raw)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=tz)
-    return dt.astimezone(tz)
+    try:
+        if len(raw) == 10 and raw[4] == "-" and raw[7] == "-":
+            d = date.fromisoformat(raw)
+            return datetime.combine(d, time(12, 0), tzinfo=tz)
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tz)
+        return dt.astimezone(tz)
+    except ValueError as exc:
+        raise ValidationAppError(f"日期格式不合法: {raw}") from exc
 
 
 def parse_date_only(raw: str) -> date:
     raw = raw.strip()
-    if len(raw) == 10:
-        return date.fromisoformat(raw)
-    dt = datetime.fromisoformat(raw)
-    return dt.date()
+    try:
+        if len(raw) == 10:
+            return date.fromisoformat(raw)
+        dt = datetime.fromisoformat(raw)
+        return dt.date()
+    except ValueError as exc:
+        raise ValidationAppError(f"日期格式不合法: {raw}") from exc
 
 
 def month_start_local(d: date | None = None) -> datetime:

@@ -110,6 +110,16 @@ async def resolve_or_create(session: AsyncSession, user_id: int, direction: str,
         path, primary, secondary = await path_for_node(session, root_exact)
         return ResolveResult(root_exact, root_exact, path, primary, secondary, "exact")
 
+    paths = await category_repo.find_paths_for_bare_name(session, user_id, direction, raw)
+    if len(paths) > 1:
+        raise ValidationAppError(
+            "类目存在多个候选，请指定完整路径",
+            candidates=paths,
+            hint="从 candidates 里选一条路径再写",
+        )
+    if len(paths) == 1:
+        return await resolve_or_create(session, user_id, direction, paths[0])
+
     aliases = EXPENSE_ALIASES if direction == "expense" else INCOME_ALIASES
     if raw in aliases:
         p_name, c_name = aliases[raw]
@@ -123,14 +133,6 @@ async def resolve_or_create(session: AsyncSession, user_id: int, direction: str,
         path, primary, secondary = await path_for_node(session, leaf)
         root_cat = await root_of(session, leaf)
         return ResolveResult(leaf, root_cat, path, primary, secondary, "alias")
-
-    paths = await category_repo.find_paths_for_bare_name(session, user_id, direction, raw)
-    if len(paths) > 1:
-        raise ValidationAppError(
-            "类目存在多个候选，请指定完整路径",
-            candidates=paths,
-            hint="从 candidates 里选一条路径再写",
-        )
 
     other = await category_repo.find_root_by_name(session, user_id, direction, "其他")
     if other is None:

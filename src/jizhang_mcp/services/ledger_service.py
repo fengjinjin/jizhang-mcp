@@ -130,10 +130,15 @@ async def add_batch(
                         "note": e.get("note"),
                     }
                 )
+            except ValidationAppError as exc:
+                exc.index = i
+                exc.message = f"第 {i} 笔: {exc.message}"
+                raise
             except Exception as exc:
                 raise ValidationAppError(
                     f"第 {i} 笔校验失败: {exc}",
                     hint="修正该笔后重试整批",
+                    index=i,
                 ) from exc
         return LedgerAddBatchOut(dry_run=True, replayed=False, items=previews)
 
@@ -174,6 +179,7 @@ async def add_batch(
                     await ledger_to_out(session, entry, resolution=resolved.resolution)
                 )
             except ValidationAppError as exc:
+                exc.index = i
                 exc.message = f"第 {i} 笔: {exc.message}"
                 raise
     except Exception:
