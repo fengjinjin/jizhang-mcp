@@ -17,6 +17,7 @@ from jizhang_mcp.exceptions import (
     PassphraseLockedError,
     UnauthenticatedError,
 )
+from jizhang_mcp.middleware.mcp_protocol_asgi import MCP_HTTP_HEADERS_INCLUDE
 from jizhang_mcp.repositories import api_key_repo, user_repo
 from jizhang_mcp.security.principal import Principal, get_principal, set_principal
 from jizhang_mcp.security.unlock_store import unlock_store
@@ -30,7 +31,7 @@ def tools_visible_to(principal: Principal) -> list[str]:
 
 
 def extract_api_key() -> str | None:
-    headers = get_http_headers(include={"authorization"}) or {}
+    headers = get_http_headers(include=set(MCP_HTTP_HEADERS_INCLUDE)) or {}
     auth = headers.get("authorization") or headers.get("Authorization")
     if auth and auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip()
@@ -45,7 +46,7 @@ def extract_api_key() -> str | None:
 
 
 def session_key_from_headers() -> str:
-    headers = get_http_headers(include={"authorization"}) or {}
+    headers = get_http_headers(include=set(MCP_HTTP_HEADERS_INCLUDE)) or {}
     sid = headers.get("mcp-session-id") or headers.get("Mcp-Session-Id")
     if sid:
         return sid

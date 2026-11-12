@@ -10,28 +10,20 @@ from mcp.types import InitializeRequest, InitializeRequestParams, InitializeResu
 from jizhang_mcp.config import get_settings
 from jizhang_mcp.middleware.mcp_auth import extract_api_key
 from jizhang_mcp.middleware.mcp_protocol import McpProductProtocolMiddleware
-from jizhang_mcp.middleware.mcp_protocol_asgi import McpProtocolAsgiMiddleware, _needs_envelope
+from jizhang_mcp.middleware.mcp_protocol_asgi import McpProtocolAsgiMiddleware, _needs_envelope, bridge_modern_request
 
 MODERN = "2026-07-28"
 
 
-@pytest.mark.asyncio
-async def test_mcp_bearer_auth_via_headers(user_with_key, app_db):
-    api_key = user_with_key["api_key"]
+def test_mcp_auth_reads_bearer_and_session_headers():
     with patch(
         "jizhang_mcp.middleware.mcp_auth.get_http_headers",
-        return_value={"authorization": f"Bearer {api_key}"},
+        return_value={"authorization": "Bearer jz_live_x", "mcp-session-id": "sess-9"},
     ):
-        assert extract_api_key() == api_key
+        from jizhang_mcp.middleware.mcp_auth import extract_api_key, session_key_from_headers
 
-    from jizhang_mcp.mcp_server import mcp
-
-    os.environ["JIZHANG_API_KEY"] = api_key
-    async with Client(mcp) as client:
-        out = await client.call_tool("auth_status", {})
-        data = out.structured_content or json.loads(out.content[0].text)
-        assert data["authenticated"] is True
-        assert data["guest"] is False
+        assert extract_api_key() == "jz_live_x"
+        assert session_key_from_headers() == "sess-9"
 
 
 @pytest.mark.asyncio
@@ -121,14 +113,9 @@ def test_modern_header_envelope_bridge():
         "params": {"name": "auth_status", "arguments": {}},
     }
     assert _needs_envelope(body["params"])
-    params = {
-        **body["params"],
-        "_meta": {
-            "io.modelcontextprotocol/protocolVersion": MODERN,
-            "io.modelcontextprotocol/clientCapabilities": {},
-        },
-    }
-    assert not _needs_envelope(params)
+    bridged, _, modified = bridge_modern_request(body, MODERN, {})
+    assert modified
+    assert not _needs_envelope(bridged["params"])
 
 
 @pytest.mark.asyncio

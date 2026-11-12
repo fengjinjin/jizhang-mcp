@@ -11,6 +11,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("JIZHANG_JWT_SECRET", "test-jwt-secret-32chars-minimum")
 os.environ["JIZHANG_REGISTER_RATE_PER_HOUR"] = "1000"
+os.environ.setdefault("FASTMCP_JSON_RESPONSE", "true")
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +68,19 @@ async def api_client(app_db):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest_asyncio.fixture
+async def mcp_http_client(app_db):
+    from asgi_lifespan import LifespanManager
+
+    from jizhang_mcp.app import create_app
+
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with LifespanManager(app):
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as client:
+            yield client
 
 
 @pytest_asyncio.fixture
