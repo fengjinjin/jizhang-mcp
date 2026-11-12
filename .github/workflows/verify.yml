@@ -1,0 +1,47 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jizhang
+          POSTGRES_PASSWORD: jizhang
+          POSTGRES_DB: jizhang
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jizhang -d jizhang"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Wheel 构建与安装冒烟
+        env:
+          JIZHANG_DATABASE_URL: postgresql+asyncpg://jizhang:jizhang@127.0.0.1:5432/jizhang
+          JIZHANG_JWT_SECRET: ci-jwt-secret-not-for-production
+        run: bash scripts/verify_build.sh
+
+      - name: 安装开发依赖并运行 pytest
+        env:
+          JIZHANG_DATABASE_URL: postgresql+asyncpg://jizhang:jizhang@127.0.0.1:5432/jizhang
+          JIZHANG_JWT_SECRET: ci-jwt-secret-not-for-production
+          JIZHANG_REGISTER_RATE_PER_HOUR: "1000"
+        run: |
+          pip install -e ".[dev]"
+          python -m alembic upgrade head
+          python -m pytest tests -q
