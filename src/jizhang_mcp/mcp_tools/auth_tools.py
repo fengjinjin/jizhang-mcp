@@ -90,7 +90,7 @@ def register(mcp: FastMCP) -> None:
     async def account_register(
         username: Annotated[str, Field(description="用户名，3～32")],
         password: Annotated[str, Field(description="密码，8～128")],
-        passphrase: Annotated[str | None, Field(description="可选暗号，4～64")] = None,
+        passphrase: Annotated[str | None, Field(description="可选暗号，1～30")] = None,
     ) -> RegisterOut:
         factory = get_session_factory()
         async with factory() as session:

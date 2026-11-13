@@ -37,5 +37,5 @@ def validate_username(username: str) -> str:
 
 
 def validate_passphrase(passphrase: str) -> None:
-    if not (4 <= len(passphrase) <= 64):
-        raise ValidationAppError("暗号长度须在 4～64 之间")
+    if not (1 <= len(passphrase) <= 30):
+        raise ValidationAppError("暗号长度须在 1～30 之间")

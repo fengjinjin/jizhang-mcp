@@ -14,6 +14,9 @@ class RecurringScheduler:
         self._stop = asyncio.Event()
 
     async def start(self) -> None:
+        if self.interval_seconds <= 0:
+            logger.info("recurring scheduler disabled")
+            return
         self._stop.clear()
         self._task = asyncio.create_task(self._loop())
 
