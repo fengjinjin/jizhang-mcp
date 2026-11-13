@@ -34,6 +34,14 @@ async def get_rule(rule_id: IdInt, user_id: int = Depends(current_user_id), sess
 @router.patch("/rules/{rule_id}")
 async def update_rule(rule_id: IdInt, patch: dict, user_id: int = Depends(current_user_id), session: AsyncSession = Depends(get_db)):
     rule = await recurring_repo.get_rule(session, user_id, rule_id)
+    merged = {
+        "frequency": rule.frequency,
+        "day_of_week": rule.day_of_week,
+        "day_of_month": rule.day_of_month,
+        "month_of_year": rule.month_of_year,
+        **{k: v for k, v in patch.items() if v is not None},
+    }
+    recurring_service.validate_recurring_schedule(merged)
     for k, v in patch.items():
         if hasattr(rule, k) and v is not None:
             setattr(rule, k, v)

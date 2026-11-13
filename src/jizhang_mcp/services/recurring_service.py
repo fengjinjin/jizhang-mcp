@@ -31,6 +31,56 @@ def clamp_day(year: int, month: int, dom: int) -> date:
     return date(year, month, min(dom, last))
 
 
+def validate_recurring_schedule(payload: dict) -> None:
+    """与 ck_recurring_calendar 一致，在入库前返回 validation_error 而非 DB 500。"""
+    freq = payload.get("frequency")
+    dow = payload.get("day_of_week")
+    dom = payload.get("day_of_month")
+    moy = payload.get("month_of_year")
+    if freq == "daily":
+        if dow is not None or dom is not None or moy is not None:
+            raise ValidationAppError("daily 规则不应设置星期或日月")
+        return
+    if freq == "weekly":
+        if dow is None or dow < 1 or dow > 7:
+            raise ValidationAppError("weekly 须指定 day_of_week 1~7")
+        if dom is not None or moy is not None:
+            raise ValidationAppError("weekly 规则不应设置日月")
+        return
+    if freq == "monthly":
+        if dow is not None or moy is not None:
+            raise ValidationAppError("monthly 规则不应设置星期或年份月份")
+        if dom is not None and not (1 <= dom <= 31):
+            raise ValidationAppError("day_of_month 须在 1~31")
+        return
+    if freq == "yearly":
+        if dow is not None:
+            raise ValidationAppError("yearly 规则不应设置星期")
+        if moy is None or not (1 <= moy <= 12):
+            raise ValidationAppError("yearly 须指定 month_of_year 1~12")
+        if dom is None or not (1 <= dom <= 31):
+            raise ValidationAppError("yearly 须指定 day_of_month 1~31")
+        if moy in (1, 3, 5, 7, 8, 10, 12):
+            if dom > 31:
+                raise ValidationAppError("该月不存在此日")
+        elif moy in (4, 6, 9, 11):
+            if dom > 30:
+                raise ValidationAppError("该月不存在此日")
+        elif moy == 2 and dom > 29:
+            raise ValidationAppError("该月不存在此日")
+        return
+    if freq not in ("daily", "weekly", "monthly", "yearly"):
+        raise ValidationAppError("frequency 不合法")
+
+
+def normalize_recurring_payload(payload: dict, start_date: date) -> dict:
+    data = dict(payload)
+    if data.get("frequency") == "monthly" and data.get("day_of_month") is None:
+        data["day_of_month"] = start_date.day
+    validate_recurring_schedule(data)
+    return data
+
+
 def next_occurrence(rule: RecurringRule, after: date) -> date:
     if rule.frequency == "daily":
         return after + timedelta(days=1)
@@ -111,6 +161,7 @@ async def add_rule(session, user_id: int, payload: dict) -> RecurringRuleOut:
     if (today_in_rule_tz_temp(tzname) - start_date).days > 31:
         raise ValidationAppError("start_date 不能早于 31 天前")
     end_date = parse_date_only(payload["end_date"]) if payload.get("end_date") else None
+    norm = normalize_recurring_payload(payload, start_date)
     rule = RecurringRule(
         user_id=user_id,
         title=payload["title"],
@@ -121,14 +172,14 @@ async def add_rule(session, user_id: int, payload: dict) -> RecurringRuleOut:
         root_category_id=resolved.root.id,
         category_path=resolved.path,
         note=payload.get("note"),
-        frequency=payload["frequency"],
-        day_of_week=payload.get("day_of_week"),
-        day_of_month=payload.get("day_of_month"),
-        month_of_year=payload.get("month_of_year"),
+        frequency=norm["frequency"],
+        day_of_week=norm.get("day_of_week"),
+        day_of_month=norm.get("day_of_month"),
+        month_of_year=norm.get("month_of_year"),
         timezone=tzname,
         start_date=start_date,
         end_date=end_date,
-        next_run_date=first_occurrence_temp(payload, start_date),
+        next_run_date=first_occurrence_temp(norm, start_date),
         status="active",
     )
     session.add(rule)
@@ -136,6 +187,7 @@ async def add_rule(session, user_id: int, payload: dict) -> RecurringRuleOut:
     await session.refresh(rule)
     if payload.get("catch_up_today", True):
         await settle_one(session, rule.id)
+        await session.refresh(rule)
     return recurring_to_out(rule)
 
 
